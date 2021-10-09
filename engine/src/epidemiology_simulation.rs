@@ -227,6 +227,7 @@ impl Epidemiology {
 
         counts_at_hr.log();
         for simulation_hour in 1..config.get_hours() {
+            debug!("Hour: {}, Total Agents: {}, Counts {:?}",simulation_hour, self.agent_location_map.current_population(),counts_at_hr);
             counts_at_hr.increment_hour();
 
             let mut read_buffer_reference = self.agent_location_map.borrow();
@@ -252,6 +253,7 @@ impl Epidemiology {
                                                 rng, write_buffer_reference, config, &mut self.grid);
 
             if Epidemiology::stop_simulation(&mut interventions.lockdown, &run_mode, *counts_at_hr) {
+                info!("Finished early, with stats: {:?}",counts_at_hr);
                 break;
             }
 

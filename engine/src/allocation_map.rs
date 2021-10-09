@@ -27,6 +27,7 @@ use crate::disease_state_machine::State;
 use crate::listeners::events::counts::Counts;
 use crate::travel_plan::Traveller;
 use std::collections::hash_map::{IterMut, Iter};
+use std::collections::HashSet;
 use fnv::FnvHashMap;
 
 #[derive(Clone)]
@@ -46,7 +47,6 @@ impl AgentLocationMap {
         for i in 0..agent_list.len() {
             map.insert(points[i], agent_list[i]);
         }
-
         AgentLocationMap { grid_size, agent_cell: map }
     }
 

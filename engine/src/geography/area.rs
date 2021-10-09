@@ -58,8 +58,8 @@ impl Area {
             None
         } else if (number_of_cells) < number_of_points * 2 {
             let mut points = Vec::with_capacity((number_of_cells) as usize);
-            for a in 0..(self.end_offset.x - self.start_offset.x).abs() {
-                for b in 0..(self.end_offset.y - self.start_offset.y).abs() {
+            for a in 0..(self.end_offset.x - self.start_offset.x).abs() + 1 {
+                for b in 0..(self.end_offset.y - self.start_offset.y).abs() + 1 {
                     let x = Point::new(a, b);
                     points.push(x);
                 }
@@ -164,6 +164,8 @@ impl Iterator for AreaIterator {
 
 #[cfg(test)]
 mod tests {
+    use std::hash::Hash;
+    use std::iter::FromIterator;
     use rand::thread_rng;
     use super::*;
 
@@ -171,12 +173,57 @@ mod tests {
         Area::new(Point { x: 0, y: 0 }, Point { x: 4, y: 4 })
     }
 
+
+    fn assert_unique<T: Eq + Hash+Clone>(data: Vec<T>) {
+        let mut set: HashSet<T> = HashSet::with_capacity(data.len());
+        for d in data.clone(){
+            set.insert(d);
+        }
+        assert_eq!(set.len(), data.len());
+    }
+
     #[test]
     fn generate_points() {
         let area = get_area();
-        let points: Option<Vec<Point>> = area.random_points(36, &mut thread_rng());
+        let points: Option<Vec<Point>> = area.random_points(25, &mut thread_rng());
         assert!(points.is_some());
-        assert_eq!(points.unwrap().len(), 36);
+        let points=points.unwrap();
+        assert_eq!(points.len(), 25);
+        assert_unique(points);
+
+        let points: Option<Vec<Point>> = area.random_points(5, &mut thread_rng());
+        assert!(points.is_some());
+        let points=points.unwrap();
+        assert_eq!(points.len(), 5);
+        assert_unique(points);
+        let points: Option<Vec<Point>> = area.random_points(50, &mut thread_rng());
+        assert!(points.is_none());
+
+        let area = Area::new(Point::new(0, 0), Point::new(0, 0));
+        let points: Option<Vec<Point>> = area.random_points(1, &mut thread_rng());
+        assert!(points.is_some());
+        let points=points.unwrap();
+        assert_eq!(points.len(), 1);
+        assert_unique(points);
+
+        let points: Option<Vec<Point>> = area.random_points(0, &mut thread_rng());
+        assert!(points.is_some());
+        let points=points.unwrap();
+        assert_eq!(points.len(), 0);
+        assert_unique(points);
+
+        let area = Area::new(Point::new(0, 0), Point::new(1, 1));
+        let points: Option<Vec<Point>> = area.random_points(4, &mut thread_rng());
+        assert!(points.is_some());
+        let points=points.unwrap();
+        assert_eq!(points.len(), 4);
+        assert_unique(points);
+
+        let points: Option<Vec<Point>> = area.random_points(2, &mut thread_rng());
+        assert!(points.is_some());
+        let points=points.unwrap();
+        assert_eq!(points.len(), 2);
+        assert_unique(points);
     }
 
     #[test]
@@ -272,5 +319,8 @@ mod tests {
         assert_eq!(area.get_number_of_cells(), 25);
         let area = Area::new(Point::new(0, 0), Point::new(0, 0));
         assert_eq!(area.get_number_of_cells(), 1);
+
+        let area = Area::new(Point::new(0, 0), Point::new(1, 1));
+        assert_eq!(area.get_number_of_cells(), 4);
     }
 }
