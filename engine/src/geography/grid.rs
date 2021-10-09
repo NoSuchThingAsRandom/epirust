@@ -66,7 +66,8 @@ impl Grid {
         let (home_loc, agents_in_order) = self.set_start_locations_and_occupancies(rng, &agent_list);
 
         self.draw(&home_loc, &self.houses, &self.offices);
-        (home_loc, agents_in_order)
+        assert_eq!(home_loc.len(),agents_in_order.len());
+        (home_loc,agents_in_order)
     }
 
     /// Makes sure that each house, has enough squares for the given number of agents
@@ -89,12 +90,13 @@ impl Grid {
             }
 
             let mut random_points_within_home = home.random_points(agents.len(), rng).expect("Not enough points in the home for agents",);
+            assert_eq!(random_points_within_home.len(),agents.len());
             self.houses_occupancy.insert(*home, agents.len() as i32);
 
             for agent in agents {
                 agents_in_order.push(*agent);
             }
-            home_loc.append(&mut random_points_within_home);
+            home_loc.append(&mut random_points_within_home.iter_mut().map(|p|home.start_offset+*p).collect());
         }
         debug!("Assigned starting location to agents");
         self.offices_occupancy = self.group_office_locations_by_occupancy(agents_in_order.as_slice());
