@@ -23,7 +23,7 @@ use crate::{agent, constants};
 use crate::agent::{Citizen, PopulationRecord};
 use crate::config::{AutoPopulation, CsvPopulation, StartingInfections};
 use crate::geography::{Area, Point};
-use crate::random_wrapper::RandomWrapper;
+
 use std::fs::File;
 use std::collections::HashMap;
 
@@ -46,7 +46,7 @@ pub struct Grid {
 
 impl Grid {
     pub fn generate_population(&mut self, auto_pop: &AutoPopulation, start_infections: &StartingInfections,
-                               rng: &mut RandomWrapper) -> (Vec<Point>, Vec<Citizen>) {
+                               rng: &mut impl rand::RngCore) -> (Vec<Point>, Vec<Citizen>) {
         debug!("Generating Population");
         let number_of_agents = auto_pop.number_of_agents;
         let working_percentage = auto_pop.working_percentage;
@@ -55,7 +55,7 @@ impl Grid {
         //        TODO: fix the hack
         let number_of_agents_using_public_transport = number_of_agents as f64 * (public_transport_percentage + 0.1) * (working_percentage + 0.1);
 
-        let transport_locations = self.transport_area.random_points(number_of_agents_using_public_transport.ceil() as i32, rng);
+        let transport_locations = self.transport_area.random_points(number_of_agents_using_public_transport.ceil() as usize, rng).expect("Not enough transport locations for the population!");
         debug!("Finished generating transport locations");
 
         let agent_list = agent::citizen_factory(number_of_agents, &self.houses, &self.offices,
@@ -69,7 +69,11 @@ impl Grid {
         (home_loc, agents_in_order)
     }
 
-    fn set_start_locations_and_occupancies(&mut self, rng: &mut RandomWrapper, agent_list: &Vec<Citizen>) -> (Vec<Point>, Vec<Citizen>) {
+    /// Makes sure that each house, has enough squares for the given number of agents
+    ///
+    /// TODO WHAT THE FUCK
+    /// Why are we generating a new agent list that is an exact copy of the old data???
+    fn set_start_locations_and_occupancies(&mut self, rng: &mut impl rand::RngCore, agent_list: &Vec<Citizen>) -> (Vec<Point>, Vec<Citizen>) {
         let mut home_loc: Vec<Point> = Vec::new();
         let agents_by_home_locations = Grid::group_agents_by_home_locations(&agent_list);
         let house_capacity = constants::HOME_SIZE * constants::HOME_SIZE;
@@ -84,7 +88,7 @@ impl Grid {
                        agents.len(), house_capacity)
             }
 
-            let mut random_points_within_home = home.random_points(agents.len() as i32, rng);
+            let mut random_points_within_home = home.random_points(agents.len(), rng).expect("Not enough points in the home for agents",);
             self.houses_occupancy.insert(*home, agents.len() as i32);
 
             for agent in agents {
@@ -97,6 +101,8 @@ impl Grid {
         (home_loc, agents_in_order)
     }
 
+
+    /// Takes a list of Citizen's and returns a hashmap of the agents that reside at the same position
     pub fn group_agents_by_home_locations(agent_list: &Vec<Citizen>) -> HashMap<&Area, Vec<&Citizen>> {
         let mut agents_by_home_locations: HashMap<&Area, Vec<&Citizen>> = HashMap::new();
         agent_list.iter().for_each(|agent| {
@@ -113,7 +119,9 @@ impl Grid {
         });
         agents_by_home_locations
     }
-
+    /// Creates a png file, of the worls
+    /// Where each vertical slice is colour coded, to the area type (Home - Yellow, Transport - Grey, Work - Dark Blue , Hospital - Red)
+    /// Draws the actual homes,
     fn draw(&self, home_locations: &Vec<Point>, homes: &Vec<Area>, offices: &Vec<Area>) {
         let mut draw_backend = BitMapBackend::new("grid.png", (self.grid_size as u32, self.grid_size as u32));
         Grid::draw_rect(&mut draw_backend, &self.housing_area, &plotters::style::YELLOW);
@@ -138,7 +146,7 @@ impl Grid {
     }
 
     pub fn read_population(&mut self, csv_pop: &CsvPopulation, starting_infections: &StartingInfections,
-                           rng: &mut RandomWrapper) -> (Vec<Point>, Vec<Citizen>) {
+                           rng: &mut impl rand::RngCore) -> (Vec<Point>, Vec<Citizen>) {
         let file = File::open(&csv_pop.file).expect("Could not read population file");
         let mut rdr = csv::Reader::from_reader(file);
         let mut homes_iter = self.houses.iter().cycle();
@@ -174,12 +182,12 @@ impl Grid {
         self.hospital_area = Area::new(start_offset, end_offset)
     }
 
-    pub fn resize_hospital(&mut self, number_of_agents: i32, hospital_staff_percentage: f64, hospital_beds_percentage: f64) {
+    pub fn resize_hospital(&mut self, number_of_agents: usize, hospital_staff_percentage: f64, hospital_beds_percentage: f64) {
         let hospital_bed_count = (number_of_agents as f64 * hospital_beds_percentage +
-            number_of_agents as f64 * hospital_staff_percentage).ceil() as i32;
+            number_of_agents as f64 * hospital_staff_percentage).ceil() as usize;
 
         if !(hospital_bed_count > self.hospital_area.get_number_of_cells()) {
-            let hospital_end_y: i32 = hospital_bed_count / (self.hospital_area.end_offset.x - self.hospital_area.start_offset.x);
+            let hospital_end_y = hospital_bed_count as i32 / (self.hospital_area.end_offset.x - self.hospital_area.start_offset.x);
             self.hospital_area = Area::new(self.hospital_area.start_offset, Point::new(self.hospital_area.end_offset.x, hospital_end_y));
             info!("Hospital capacity {}: ", hospital_bed_count);
         }
@@ -197,6 +205,7 @@ impl Grid {
     //     occupancy
     // }
 
+    /// Retrieves the number of Citizens per work building
     pub fn group_office_locations_by_occupancy(&self, citizens: &[Citizen]) -> HashMap<Area, i32> {
         let mut occupancy = HashMap::new();
         self.offices.iter().for_each(|house| {
@@ -210,13 +219,13 @@ impl Grid {
         occupancy
     }
 
-    pub fn choose_house_with_free_space(&self, _rng: &mut RandomWrapper) -> Area {
+    pub fn choose_house_with_free_space(&self, _rng: &mut impl rand::RngCore) -> Area {
         let house_capacity = constants::HOME_SIZE * constants::HOME_SIZE;
         *self.houses_occupancy.iter().find(|(_house, occupants)| **occupants < house_capacity)
             .expect("Couldn't find any house with free space!").0
     }
 
-    pub fn choose_office_with_free_space(&self, _rng: &mut RandomWrapper) -> Area {
+    pub fn choose_office_with_free_space(&self, _rng: &mut impl rand::RngCore) -> Area {
         let office_capacity = constants::OFFICE_SIZE * constants::OFFICE_SIZE;
         *self.offices_occupancy.iter().find(|(_house, occupants)| **occupants < office_capacity)
             .expect("Couldn't find any offices with free space!").0
@@ -241,12 +250,13 @@ impl Grid {
 
 #[cfg(test)]
 mod tests {
+    use rand::thread_rng;
     use super::*;
     use crate::geography::define_geography;
 
     #[test]
     fn should_generate_population() {
-        let mut rng = RandomWrapper::new();
+        let mut rng = thread_rng();
 
         let mut grid = define_geography(100);
         let housing_area = grid.housing_area;

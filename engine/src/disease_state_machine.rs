@@ -18,7 +18,7 @@
  */
 
 use crate::disease::Disease;
-use crate::random_wrapper::RandomWrapper;
+
 use rand::Rng;
 use crate::constants;
 use rand::seq::SliceRandom;
@@ -73,13 +73,13 @@ impl DiseaseStateMachine {
         }
     }
 
-    pub fn infect(&mut self, rng: &mut RandomWrapper, sim_hr: i32, disease: &Disease) -> bool {
+    pub fn infect(&mut self, rng: &mut impl rand::RngCore, sim_hr: i32, disease: &Disease) -> bool {
         match self.state {
             State::Exposed { at_hour } => {
-                let option = constants::RANGE_FOR_EXPOSED.choose(rng.get());
+                let option = constants::RANGE_FOR_EXPOSED.choose(rng);
                 let random_factor = *option.unwrap();
                 if sim_hr - at_hour >= disease.get_exposed_duration() + random_factor {
-                    let symptoms = rng.get().gen_bool(1.0 - disease.get_percentage_asymptomatic_population());
+                    let symptoms = rng.gen_bool(1.0 - disease.get_percentage_asymptomatic_population());
                     let mut severity = InfectionSeverity::Pre { at_hour: sim_hr };
                     if !symptoms {
                         severity = InfectionSeverity::Mild {};
@@ -95,14 +95,14 @@ impl DiseaseStateMachine {
         }
     }
 
-    pub fn change_infection_severity(&mut self, current_hour: i32, rng: &mut RandomWrapper, disease: &Disease) {
+    pub fn change_infection_severity(&mut self, current_hour: i32, rng: &mut impl rand::RngCore, disease: &Disease) {
         match self.state {
             State::Infected { symptoms: true, severity } => {
                 match severity {
                     InfectionSeverity::Pre { at_hour } => {
                         if current_hour - at_hour >= disease.get_pre_symptomatic_duration() {
                             let mut severity = InfectionSeverity::Mild {};
-                            let severe = rng.get().gen_bool(disease.get_percentage_severe_infected_population());
+                            let severe = rng.gen_bool(disease.get_percentage_severe_infected_population());
                             if severe {
                                 severity = InfectionSeverity::Severe {};
                             }
@@ -129,7 +129,7 @@ impl DiseaseStateMachine {
         }
     }
 
-    pub fn decease(&mut self, rng: &mut RandomWrapper, disease: &Disease) -> (i32, i32) {
+    pub fn decease(&mut self, rng: &mut impl rand::RngCore, disease: &Disease) -> (i32, i32) {
         match self.state {
             State::Infected { symptoms: true, severity: InfectionSeverity::Severe {} } => {
                 if self.infection_day == disease.get_disease_last_day() {
@@ -269,6 +269,7 @@ impl DiseaseStateMachine {
 
 #[cfg(test)]
 mod tests {
+    use rand::thread_rng;
     use super::*;
 
     #[test]
@@ -288,7 +289,7 @@ mod tests {
         let mut machine = DiseaseStateMachine::new();
         let disease = Disease::new(10, 20, 40, 9, 12, 0.025, 0.25, 0.02, 0.3, 0.3, 24, 24);
         machine.expose(100);
-        machine.infect(&mut RandomWrapper::new(), 140, &disease);
+        machine.infect(&mut thread_rng(), 140, &disease);
 
         let result = match machine.state {
             State::Infected { symptoms: false, severity: InfectionSeverity::Mild {} } => true,
@@ -305,7 +306,7 @@ mod tests {
         let disease = Disease::new(10, 20, 40, 9, 12, 0.025, 0.25, 0.02, 0.3, 0.3, 24, 24);
 
         machine.expose(100);
-        machine.infect(&mut RandomWrapper::new(), 110, &disease);
+        machine.infect(&mut thread_rng(), 110, &disease);
 
         let result = match machine.state {
             State::Exposed { .. } => true,
@@ -327,7 +328,7 @@ mod tests {
     fn should_change_infection_severity() {
         let mut machine = DiseaseStateMachine::new();
         let disease = Disease::new(10, 20, 40, 9, 12, 0.025, 0.25, 0.02, 0.3, 0.3, 24, 24);
-        let mut rng = RandomWrapper::new();
+        let mut rng = thread_rng();
 
         machine.state = State::Infected { symptoms: true, severity: InfectionSeverity::Pre { at_hour: 100 } };
 
@@ -352,7 +353,7 @@ mod tests {
     fn should_not_change_infection_severity() {
         let mut machine = DiseaseStateMachine::new();
         let disease = Disease::new(10, 20, 40, 9, 12, 0.025, 0.25, 0.02, 0.3, 0.3, 24, 24);
-        let mut rng = RandomWrapper::new();
+        let mut rng = thread_rng();
 
         machine.state = State::Infected { symptoms: true, severity: InfectionSeverity::Pre { at_hour: 100 } };
 

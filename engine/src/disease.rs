@@ -20,7 +20,7 @@
 use rand::Rng;
 use serde::Deserialize;
 
-use crate::random_wrapper::RandomWrapper;
+
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy)]
 pub struct Disease {
@@ -90,8 +90,8 @@ impl Disease {
         self.last_day
     }
 
-    pub fn to_be_deceased(&self, rng: &mut RandomWrapper) -> bool {
-        if rng.get().gen_bool(self.death_rate) {
+    pub fn to_be_deceased(&self, rng: &mut impl rand::RngCore) -> bool {
+        if rng.gen_bool(self.death_rate) {
             return true;
         }
         false

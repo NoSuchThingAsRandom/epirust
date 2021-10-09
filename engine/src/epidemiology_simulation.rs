@@ -23,7 +23,7 @@ use std::time::{Duration, Instant, SystemTime};
 
 use chrono::{DateTime, Local};
 use futures::StreamExt;
-use rand::Rng;
+use rand::{Rng, thread_rng};
 
 use crate::{allocation_map, RunMode, ticks_consumer, travellers_consumer};
 use crate::allocation_map::AgentLocationMap;
@@ -40,7 +40,7 @@ use crate::listeners::disease_tracker::Hotspot;
 use crate::listeners::events::counts::Counts;
 use crate::listeners::events_kafka_producer::EventsKafkaProducer;
 use crate::listeners::listener::{Listeners, Listener};
-use crate::random_wrapper::RandomWrapper;
+
 use rdkafka::consumer::{MessageStream, DefaultConsumerContext};
 use crate::ticks_consumer::Tick;
 use crate::travel_plan::{EngineTravelPlan, TravellersByRegion, Traveller};
@@ -61,17 +61,20 @@ pub struct Epidemiology {
 }
 
 impl Epidemiology {
+    /// First build the map - see geography
+    /// Then generates a population of the given size
+    ///     Each agent, is given a random home and work place that they use throughout the pandemic
     pub fn new(config: &Config, sim_id: String) -> Epidemiology {
         let start = Instant::now();
         let disease = config.get_disease();
         let start_infections = config.get_starting_infections();
         let mut grid = geography::define_geography(config.get_grid_size());
-        let mut rng = RandomWrapper::new();
+        let mut rng = thread_rng();
         let (start_locations, agent_list) = match config.get_population() {
             Population::Csv(csv_pop) => grid.read_population(&csv_pop, &start_infections, &mut rng),
             Population::Auto(auto_pop) => grid.generate_population(&auto_pop, &start_infections, &mut rng),
         };
-        grid.resize_hospital(agent_list.len() as i32, HOSPITAL_STAFF_PERCENTAGE, config.get_geography_parameters().hospital_beds_percentage);
+        grid.resize_hospital(agent_list.len(), HOSPITAL_STAFF_PERCENTAGE, config.get_geography_parameters().hospital_beds_percentage);
 
         let agent_location_map = allocation_map::AgentLocationMap::new(config.get_grid_size(), &agent_list, &start_locations);
         let write_agent_location_map = agent_location_map.clone();
@@ -144,7 +147,7 @@ impl Epidemiology {
         Counts::new(s, e, i)
     }
 
-    fn init_interventions(&mut self, config: &Config, rng: &mut RandomWrapper) -> Interventions {
+    fn init_interventions(&mut self, config: &Config, rng: &mut impl rand::RngCore) -> Interventions {
         let vaccinations = VaccinateIntervention::init(config);
         let lock_down_details = LockdownIntervention::init(config);
         let hospital_intervention = BuildNewHospital::init(config);
@@ -161,7 +164,7 @@ impl Epidemiology {
     }
 
     fn process_interventions(interventions: &mut Interventions, counts_at_hr: &Counts,
-                             listeners: &mut Listeners, rng: &mut RandomWrapper, write_buffer: &mut AgentLocationMap,
+                             listeners: &mut Listeners, rng: &mut impl rand::RngCore, write_buffer: &mut AgentLocationMap,
                              config: &Config, grid: &mut Grid) {
         Epidemiology::apply_vaccination_intervention(
             &interventions.vaccinate,
@@ -197,7 +200,7 @@ impl Epidemiology {
         let mut listeners = self.create_listeners(config, run_mode);
         let population = self.agent_location_map.current_population();
         let mut counts_at_hr = Epidemiology::counts_at_start(population, &config.get_starting_infections());
-        let mut rng = RandomWrapper::new();
+        let mut rng = thread_rng();
 
         self.write_agent_location_map.init_with_capacity(population as usize);
 
@@ -217,7 +220,7 @@ impl Epidemiology {
     }
 
     pub async fn run_single_engine(&mut self, config: &Config, run_mode: &RunMode, listeners: &mut Listeners,
-                                   counts_at_hr: &mut Counts, interventions: &mut Interventions, rng: &mut RandomWrapper) {
+                                   counts_at_hr: &mut Counts, interventions: &mut Interventions, rng: &mut impl rand::RngCore) {
         let start_time = Instant::now();
         let mut outgoing = Vec::new();
         let percent_outgoing = 0.0;
@@ -266,7 +269,7 @@ impl Epidemiology {
     }
 
     pub async fn run_multi_engine(&mut self, config: &Config, run_mode: &RunMode, listeners: &mut Listeners,
-                                  counts_at_hr: &mut Counts, interventions: &mut Interventions, rng: &mut RandomWrapper) {
+                                  counts_at_hr: &mut Counts, interventions: &mut Interventions, rng: &mut impl rand::RngCore) {
         let start_time = Instant::now();
         let mut producer = KafkaProducer::new();
 
@@ -445,7 +448,7 @@ impl Epidemiology {
     }
 
     fn apply_vaccination_intervention(vaccinations: &VaccinateIntervention, counts: &Counts,
-                                      write_buffer_reference: &mut AgentLocationMap, rng: &mut RandomWrapper,
+                                      write_buffer_reference: &mut AgentLocationMap, rng: &mut impl rand::RngCore,
                                       listeners: &mut Listeners) {
         match vaccinations.get_vaccination_percentage(counts) {
             Some(vac_percent) => {
@@ -457,9 +460,9 @@ impl Epidemiology {
         };
     }
 
-    fn vaccinate(vaccination_percentage: f64, write_buffer_reference: &mut AgentLocationMap, rng: &mut RandomWrapper) {
+    fn vaccinate(vaccination_percentage: f64, write_buffer_reference: &mut AgentLocationMap, rng: &mut impl rand::RngCore) {
         for (_v, agent) in write_buffer_reference.iter_mut() {
-            if agent.state_machine.is_susceptible() && rng.get().gen_bool(vaccination_percentage) {
+            if agent.state_machine.is_susceptible() && rng.gen_bool(vaccination_percentage) {
                 agent.set_vaccination(true);
             }
         }
@@ -467,7 +470,7 @@ impl Epidemiology {
 
     fn simulate(csv_record: &mut Counts, simulation_hour: i32, read_buffer: &AgentLocationMap,
                 write_buffer: &mut AgentLocationMap, grid: &Grid, listeners: &mut Listeners,
-                rng: &mut RandomWrapper, disease: &Disease, percent_outgoing: f64,
+                rng: &mut impl rand::RngCore, disease: &Disease, percent_outgoing: f64,
                 outgoing: &mut Vec<(Point, Traveller)>, publish_citizen_state: bool) {
         write_buffer.clear();
         csv_record.clear();
@@ -488,7 +491,7 @@ impl Epidemiology {
             };
 
             if simulation_hour % 24 == 0 && current_agent.can_move()
-                && rng.get().gen_bool(percent_outgoing) {
+                && rng.gen_bool(percent_outgoing) {
                 let traveller = Traveller::from(&current_agent);
                 outgoing.push((*new_location, traveller));
             }
@@ -503,17 +506,17 @@ impl Epidemiology {
 
     fn update_counts(counts_at_hr: &mut Counts, citizen: &Citizen) {
         match citizen.state_machine.state {
-            State::Susceptible { .. } => { counts_at_hr.update_susceptible(1) },
-            State::Exposed { .. } => { counts_at_hr.update_exposed(1) },
+            State::Susceptible { .. } => { counts_at_hr.update_susceptible(1) }
+            State::Exposed { .. } => { counts_at_hr.update_exposed(1) }
             State::Infected { .. } => {
                 if citizen.is_hospitalized() {
                     counts_at_hr.update_hospitalized(1);
                 } else {
                     counts_at_hr.update_infected(1)
                 }
-            },
-            State::Recovered { .. } => { counts_at_hr.update_recovered(1) },
-            State::Deceased { .. } => { counts_at_hr.update_deceased(1) } ,
+            }
+            State::Recovered { .. } => { counts_at_hr.update_recovered(1) }
+            State::Deceased { .. } => { counts_at_hr.update_deceased(1) }
         }
     }
 

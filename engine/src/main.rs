@@ -23,7 +23,11 @@ extern crate serde_derive;
 #[macro_use]
 extern crate log;
 
+use std::time::Instant;
 use clap::{App, Arg};
+use rand::prelude::SliceRandom;
+use rand::thread_rng;
+use crate::geography::Point;
 
 use crate::kafka_consumer::KafkaConsumer;
 
@@ -34,7 +38,6 @@ mod epidemiology_simulation;
 mod allocation_map;
 mod geography;
 mod disease;
-mod random_wrapper;
 mod listeners;
 mod population;
 // mod geojson_service;

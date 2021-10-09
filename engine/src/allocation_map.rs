@@ -21,7 +21,7 @@
 use crate::agent;
 use crate::geography::{Area, Grid};
 use crate::geography::Point;
-use crate::random_wrapper::RandomWrapper;
+
 use crate::agent::Citizen;
 use crate::disease_state_machine::State;
 use crate::listeners::events::counts::Counts;
@@ -57,7 +57,7 @@ impl AgentLocationMap {
         old_cell
     }
 
-    pub fn goto_hospital(&self, hospital_area: &Area, cell: Point, citizen: &mut agent::Citizen) -> (bool, Point) {
+    pub fn goto_hospital(&self, hospital_area: &Area, cell: Point, citizen: &mut agent::Citizen,rng: &mut impl rand::RngCore) -> (bool, Point) {
         let vacant_hospital_cell = hospital_area.iter().find(|cell| {
             self.is_cell_vacant(cell)
         });
@@ -65,7 +65,7 @@ impl AgentLocationMap {
             Some(x) => (true, self.move_agent(cell, x)),
             None => {
                 (false,
-                 self.move_agent(cell, citizen.home_location.get_random_point(&mut RandomWrapper::new())))
+                 self.move_agent(cell, citizen.home_location.get_random_point(rng)))
             }
         }
     }
@@ -114,7 +114,7 @@ impl AgentLocationMap {
     }
 
     pub fn assimilate_citizens(&mut self, incoming: &mut Vec<Traveller>, grid: &mut Grid, counts: &mut Counts,
-                               rng: &mut RandomWrapper) {
+                               rng: &mut impl rand::RngCore) {
         if incoming.is_empty() {
             return;
         }
@@ -148,7 +148,7 @@ impl AgentLocationMap {
         }
     }
 
-    fn random_starting_point(&self, area: &Area, rng: &mut RandomWrapper) -> Point {
+    fn random_starting_point(&self, area: &Area, rng: &mut impl rand::RngCore) -> Point {
         loop {
             let point = area.get_random_point(rng);
             if !self.agent_cell.contains_key(&point) {
@@ -184,12 +184,13 @@ impl AgentLocationMap {
 
 #[cfg(test)]
 mod tests {
+    use rand::thread_rng;
     use super::*;
-    use crate::random_wrapper::RandomWrapper;
+
     use crate::agent::WorkStatus;
 
     fn before_each() -> AgentLocationMap {
-        let mut rng = RandomWrapper::new();
+        let mut rng = thread_rng();
         let points = vec![Point { x: 0, y: 1 }, Point { x: 1, y: 0 }];
         let home_locations = vec![Area::new(Point::new(0, 0), Point::new(2, 2)), Area::new(Point::new(3, 0), Point::new(4, 2))];
 
@@ -210,7 +211,7 @@ mod tests {
 
     #[test]
     fn should_goto_hospital() {
-        let mut rng = RandomWrapper::new();
+        let mut rng = thread_rng();
         let points = vec![Point { x: 0, y: 1 }, Point { x: 1, y: 0 }];
         let work_status = WorkStatus::Normal {};
         let home_locations = vec![Area::new(Point::new(0, 0), Point::new(2, 2)), Area::new(Point::new(3, 0), Point::new(4, 2))];
@@ -221,7 +222,7 @@ mod tests {
         let agents = vec![citizen1, citizen2];
         let map = AgentLocationMap::new(5, &agents, &points);
         let hospital = Area::new(Point::new(2, 2), Point::new(4, 4));
-        let result = map.goto_hospital(&hospital, points[0], &mut citizen1);
+        let result = map.goto_hospital(&hospital, points[0], &mut citizen1,&mut thread_rng());
 
         assert_eq!(result.0, true);
         assert_eq!(result.1, Point::new(2, 2));
@@ -229,7 +230,7 @@ mod tests {
 
     #[test]
     fn should_goto_home_location_when_hospital_full() {
-        let mut rng = RandomWrapper::new();
+        let mut rng = thread_rng();
         let points = vec![Point::new(0, 0), Point::new(0, 1), Point::new(1, 0), Point::new(1, 1)];
         let home = Area::new(Point::new(0, 0), Point::new(2, 2));
         let work_status = WorkStatus::NA {};
@@ -243,7 +244,7 @@ mod tests {
         let map = AgentLocationMap::new(5, &agents, &points);
         let hospital = Area::new(Point::new(0, 0), Point::new(1, 1));
 
-        let result = map.goto_hospital(&hospital, points[0], &mut citizen1);
+        let result = map.goto_hospital(&hospital, points[0], &mut citizen1,&mut thread_rng());
 
         assert_eq!(result.0, false);
         assert_eq!(citizen1.clone().home_location.contains(&result.1), true);
