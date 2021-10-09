@@ -58,8 +58,8 @@ impl Area {
             None
         } else if (number_of_cells) < number_of_points * 2 {
             let mut points = Vec::with_capacity((number_of_cells) as usize);
-            for a in 0..(self.end_offset.x - self.start_offset.x).abs() + 1 {
-                for b in 0..(self.end_offset.y - self.start_offset.y).abs() + 1 {
+            for a in self.start_offset.x..self.end_offset.x + 1 {
+                for b in self.start_offset.y..self.end_offset.y {
                     let x = Point::new(a, b);
                     points.push(x);
                 }

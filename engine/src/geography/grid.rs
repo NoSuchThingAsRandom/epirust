@@ -96,7 +96,7 @@ impl Grid {
             for agent in agents {
                 agents_in_order.push(*agent);
             }
-            home_loc.append(&mut random_points_within_home.iter_mut().map(|p|home.start_offset+*p).collect());
+            home_loc.append(&mut random_points_within_home);
         }
         debug!("Assigned starting location to agents");
         self.offices_occupancy = self.group_office_locations_by_occupancy(agents_in_order.as_slice());
