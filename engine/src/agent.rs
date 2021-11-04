@@ -30,7 +30,7 @@ use crate::constants;
 use crate::disease::Disease;
 use crate::disease_state_machine::DiseaseStateMachine;
 use crate::geography::{Area, Grid, Point};
-use crate::random_wrapper::RandomWrapper;
+
 use crate::travel_plan::Traveller;
 
 #[derive(Deserialize)]
@@ -87,13 +87,13 @@ pub struct Citizen {
 
 impl Citizen {
     pub fn new(home_location: Area, work_location: Area, transport_location: Point,
-               uses_public_transport: bool, working: bool, work_status: WorkStatus, rng: &mut RandomWrapper) -> Citizen {
+               uses_public_transport: bool, working: bool, work_status: WorkStatus, rng: &mut impl rand::RngCore) -> Citizen {
         Citizen::new_with_id(Uuid::new_v4(), home_location, work_location, transport_location, uses_public_transport,
                              working, work_status, rng)
     }
 
     pub fn new_with_id(id: Uuid, home_location: Area, work_location: Area, transport_location: Point,
-                       uses_public_transport: bool, working: bool, work_status: WorkStatus, rng: &mut RandomWrapper) -> Citizen {
+                       uses_public_transport: bool, working: bool, work_status: WorkStatus, rng: &mut impl rand::RngCore) -> Citizen {
         let disease_randomness_factor = Citizen::generate_disease_randomness_factor(rng);
 
         Citizen {
@@ -135,7 +135,7 @@ impl Citizen {
     }
 
     pub fn from_record(record: PopulationRecord, home_location: Area, work_location: Area,
-                       transport_location: Point, rng: &mut RandomWrapper) -> Citizen {
+                       transport_location: Point, rng: &mut impl rand::RngCore) -> Citizen {
         let disease_randomness_factor = Citizen::generate_disease_randomness_factor(rng);
         let work_status = Citizen::derive_work_status(record.working, rng);
 
@@ -192,25 +192,25 @@ impl Citizen {
         self.vaccinated
     }
 
-    fn generate_disease_randomness_factor(rng: &mut RandomWrapper) -> i32 {
-        let option = constants::IMMUNITY_RANGE.choose(rng.get());
+    fn generate_disease_randomness_factor(rng: &mut impl rand::RngCore) -> i32 {
+        let option = constants::IMMUNITY_RANGE.choose(rng);
         *option.unwrap()
     }
 
     pub fn perform_operation(&mut self, cell: Point, simulation_hour: i32, grid: &Grid, map: &AgentLocationMap,
-                             rng: &mut RandomWrapper, disease: &Disease) -> Point {
+                             rng: &mut impl rand::RngCore, disease: &Disease) -> Point {
         self.routine(cell, simulation_hour, grid, map, rng, disease)
     }
 
     fn routine(&mut self, cell: Point, simulation_hour: i32, grid: &Grid, map: &AgentLocationMap,
-               rng: &mut RandomWrapper, disease: &Disease) -> Point {
+               rng: &mut impl rand::RngCore, disease: &Disease) -> Point {
         let mut new_cell = cell;
 
         let current_hour = simulation_hour % constants::NUMBER_OF_HOURS;
         match current_hour {
             constants::ROUTINE_START_TIME => {
                 self.update_infection_day();
-                new_cell = self.hospitalize(cell, &grid.hospital_area, map, disease);
+                new_cell = self.hospitalize(cell, &grid.hospital_area, map, rng,disease);
             }
             constants::SLEEP_START_TIME..=constants::SLEEP_END_TIME => {
                 if !self.is_hospital_staff() {
@@ -242,7 +242,7 @@ impl Citizen {
     }
 
     fn perform_movements(&mut self, cell: Point, hour_of_day: i32, simulation_hr: i32, grid: &Grid,
-                         map: &AgentLocationMap, rng: &mut RandomWrapper, disease: &Disease) -> Point {
+                         map: &AgentLocationMap, rng: &mut impl rand::RngCore, disease: &Disease) -> Point {
         let mut new_cell = cell;
         match self.work_status {
             WorkStatus::Normal {} | WorkStatus::Essential {} => {
@@ -326,7 +326,7 @@ impl Citizen {
     }
 
     fn update_infection_dynamics(&mut self, cell: Point, map: &AgentLocationMap,
-                                 sim_hr: i32, rng: &mut RandomWrapper, disease: &Disease) {
+                                 sim_hr: i32, rng: &mut impl rand::RngCore, disease: &Disease) {
         self.update_exposure(cell, map, sim_hr, rng, disease);
         self.update_infection(sim_hr, rng, &disease);
         self.update_infection_severity(sim_hr, rng, disease);
@@ -338,13 +338,13 @@ impl Citizen {
         }
     }
 
-    fn hospitalize(&mut self, cell: Point, hospital: &Area, map: &AgentLocationMap,
+    fn hospitalize(&mut self, cell: Point, hospital: &Area, map: &AgentLocationMap, rng: &mut impl rand::RngCore,
                    disease: &Disease) -> Point {
         let mut new_cell = cell;
         if self.state_machine.is_infected() && !self.hospitalized {
             let to_be_hospitalized = self.state_machine.hospitalize(disease, self.immunity);
             if to_be_hospitalized {
-                let (is_hospitalized, new_location) = AgentLocationMap::goto_hospital(map, hospital, cell, self);
+                let (is_hospitalized, new_location) = AgentLocationMap::goto_hospital(map, hospital, cell, self, rng);
                 new_cell = new_location;
                 if is_hospitalized {
                     self.hospitalized = true;
@@ -354,19 +354,19 @@ impl Citizen {
         new_cell
     }
 
-    fn update_infection_severity(&mut self, sim_hr: i32, rng: &mut RandomWrapper, disease: &Disease) {
+    fn update_infection_severity(&mut self, sim_hr: i32, rng: &mut impl rand::RngCore, disease: &Disease) {
         if self.state_machine.is_pre_symptomatic() {
             self.state_machine.change_infection_severity(sim_hr, rng, disease);
         }
     }
 
-    fn update_infection(&mut self, sim_hr: i32, rng: &mut RandomWrapper, disease: &Disease) {
+    fn update_infection(&mut self, sim_hr: i32, rng: &mut impl rand::RngCore, disease: &Disease) {
         if self.state_machine.is_exposed() {
             self.state_machine.infect(rng, sim_hr, &disease);
         }
     }
 
-    fn update_exposure(&mut self, cell: Point, map: &AgentLocationMap, sim_hr: i32, rng: &mut RandomWrapper,
+    fn update_exposure(&mut self, cell: Point, map: &AgentLocationMap, sim_hr: i32, rng: &mut impl rand::RngCore,
                        disease: &Disease) {
         if self.state_machine.is_susceptible() && !self.work_quarantined && !self.vaccinated {
             let neighbours = self.current_area.get_neighbors_of(cell);
@@ -375,7 +375,7 @@ impl Citizen {
                 .filter(|p| map.is_point_in_grid(p))
                 .filter_map(|cell| { map.get_agent_for(&cell) })
                 .filter(|agent| agent.state_machine.is_infected() && !agent.hospitalized)
-                .find(|neighbor| rng.get().gen_bool(neighbor.get_infection_transmission_rate(disease)));
+                .find(|neighbor| rng.gen_bool(neighbor.get_infection_transmission_rate(disease)));
 
             if neighbor_that_spreads_infection.is_some() {
                 self.state_machine.expose(sim_hr);
@@ -383,13 +383,13 @@ impl Citizen {
         }
     }
 
-    fn goto_area(&mut self, target_area: Area, map: &AgentLocationMap, cell: Point, rng: &mut RandomWrapper) -> Point {
+    fn goto_area(&mut self, target_area: Area, map: &AgentLocationMap, cell: Point, rng: &mut impl rand::RngCore) -> Point {
         //TODO: Refactor - Jayanta
         // If agent is working and current_area is work, target area is home and symptomatic then allow movement
         let mut override_movement = false;
 
-        match self.work_status{
-            WorkStatus::Normal{} | WorkStatus::Essential{} => {
+        match self.work_status {
+            WorkStatus::Normal {} | WorkStatus::Essential {} => {
                 if self.work_location.contains(&cell) && target_area == self.home_location && (self.state_machine.is_mild_symptomatic() || self.state_machine.is_infected_severe()) {
                     override_movement = true;
                 }
@@ -410,7 +410,7 @@ impl Citizen {
         self.move_agent_from(map, cell, rng)
     }
 
-    fn deceased(&mut self, map: &AgentLocationMap, cell: Point, rng: &mut RandomWrapper,
+    fn deceased(&mut self, map: &AgentLocationMap, cell: Point, rng: &mut impl rand::RngCore,
                 disease: &Disease) -> Point {
         let mut new_cell = cell;
         if self.state_machine.is_infected() {
@@ -419,7 +419,7 @@ impl Citizen {
                 new_cell = map.move_agent(cell, self.home_location.get_random_point(rng));
             }
             if result != (0, 0) {
-                if self.hospitalized{
+                if self.hospitalized {
                     self.hospitalized = false;
                 }
             }
@@ -427,7 +427,7 @@ impl Citizen {
         new_cell
     }
 
-    fn move_agent_from(&mut self, map: &AgentLocationMap, cell: Point, rng: &mut RandomWrapper) -> Point {
+    fn move_agent_from(&mut self, map: &AgentLocationMap, cell: Point, rng: &mut impl rand::RngCore) -> Point {
         if !self.can_move() {
             return cell;
         }
@@ -439,15 +439,15 @@ impl Citizen {
         let new_cell = self.current_area.get_neighbors_of(current_location)
             .filter(|p| map.is_point_in_grid(p))
             .filter(|p| map.is_cell_vacant(p))
-            .choose(rng.get())
+            .choose(rng)
             .unwrap_or(cell);
         map.move_agent(cell, new_cell)
     }
 
-    pub fn assign_essential_worker(&mut self, essential_workers_percentage: f64, rng: &mut RandomWrapper) {
+    pub fn assign_essential_worker(&mut self, essential_workers_percentage: f64, rng: &mut impl rand::RngCore) {
         match self.work_status {
             WorkStatus::Normal {} => {
-                if rng.get().gen_bool(essential_workers_percentage) {
+                if rng.gen_bool(essential_workers_percentage) {
                     self.work_status = WorkStatus::Essential {};
                 }
             }
@@ -455,9 +455,9 @@ impl Citizen {
         }
     }
 
-    fn derive_work_status(is_working: bool, rng: &mut RandomWrapper) -> WorkStatus {
+    fn derive_work_status(is_working: bool, rng: &mut impl rand::RngCore) -> WorkStatus {
         if is_working {
-            if rng.get().gen_bool(constants::HOSPITAL_STAFF_PERCENTAGE) {
+            if rng.gen_bool(constants::HOSPITAL_STAFF_PERCENTAGE) {
                 return WorkStatus::HospitalStaff { work_start_at: constants::ROUTINE_WORK_TIME };
             }
             return WorkStatus::Normal {};
@@ -490,21 +490,24 @@ impl Citizen {
     }
 }
 
+/// Builds all the citizens - and related info
+/// Allocates them evenly to homes and work places (NOTE Groups of people will share the same work/home places) - why?
+/// Assigns them to a transport square,
 pub fn citizen_factory(number_of_agents: i32, home_locations: &Vec<Area>, work_locations: &Vec<Area>, public_transport_locations: &Vec<Point>,
-                       percentage_public_transport: f64, working_percentage: f64, rng: &mut RandomWrapper,
+                       percentage_public_transport: f64, working_percentage: f64, rng: &mut impl rand::RngCore,
                        starting_infections: &StartingInfections) -> Vec<Citizen> {
     let mut agent_list = Vec::with_capacity(home_locations.len());
-
     for i in 0..number_of_agents as usize {
-        let is_a_working_citizen = rng.get().gen_bool(working_percentage);
+        let is_a_working_citizen = rng.gen_bool(working_percentage);
 
         let total_home_locations = home_locations.len();
         let total_work_locations = work_locations.len();
-
+        // TODO Change this, to randomly distribute
+        home_locations.choose(rng);
         let home_location = home_locations[(i % total_home_locations)];
         let work_location = work_locations[(i % total_work_locations)];
 
-        let uses_public_transport = rng.get().gen_bool(percentage_public_transport)
+        let uses_public_transport = rng.gen_bool(percentage_public_transport)
             && is_a_working_citizen
             && i < public_transport_locations.len();
         //TODO: Check the logic - Jayanta
@@ -529,7 +532,7 @@ pub fn citizen_factory(number_of_agents: i32, home_locations: &Vec<Area>, work_l
 }
 
 pub fn set_starting_infections(agent_list: &mut Vec<Citizen>, start_infections: &StartingInfections,
-                               rng: &mut RandomWrapper) {
+                               rng: &mut impl rand::RngCore) {
     if start_infections.total() as usize > agent_list.len() {
         panic!("There are {} people set to infect, but only {} agents available",
                start_infections.total(), agent_list.len())
@@ -537,7 +540,7 @@ pub fn set_starting_infections(agent_list: &mut Vec<Citizen>, start_infections: 
     if start_infections.total() == 0 {
         warn!("Simulation configured to start without any infected agents");
     }
-    let mut to_infect = agent_list.iter_mut().choose_multiple(rng.get(), start_infections.total() as usize);
+    let mut to_infect = agent_list.iter_mut().choose_multiple(rng, start_infections.total() as usize);
     let mut citizens = to_infect.iter_mut();
 
     for _i in 0..start_infections.get_exposed() {
@@ -556,10 +559,11 @@ pub fn set_starting_infections(agent_list: &mut Vec<Citizen>, start_infections: 
 
 #[cfg(test)]
 mod tests {
+    use rand::thread_rng;
     use super::*;
 
     fn before_each() -> Vec<Citizen> {
-        let mut rng = RandomWrapper::new();
+        let mut rng = thread_rng();
         let home_locations = vec![Area::new(Point::new(0, 0), Point::new(2, 2)), Area::new(Point::new(3, 0), Point::new(4, 2))];
 
         let work_locations = vec![Area::new(Point::new(5, 0), Point::new(6, 2)), Area::new(Point::new(7, 0), Point::new(8, 2))];
@@ -588,7 +592,7 @@ mod tests {
         let home_location = Area::new(Point::new(0, 0), Point::new(10, 10));
         let work_location = Area::new(Point::new(11, 0), Point::new(20, 20));
         let mut citizens = Vec::new();
-        let mut rng = RandomWrapper::new();
+        let mut rng = thread_rng();
         for _i in 0..20 {
             let citizen = Citizen::new(home_location, work_location, Point::new(2, 2), false,
                                        true, WorkStatus::Normal, &mut rng);

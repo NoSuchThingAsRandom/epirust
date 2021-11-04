@@ -17,6 +17,18 @@
  *
  */
 
+//! This seems to make a rectangle of grid_size X grid_size
+//! Then breaks it up into 4 vertical slices
+//! Width dictated by: HOUSE_AREA_RELATIVE_SIZE, TRANSPORT_AREA_RELATIVE_SIZE, WORK_AREA_RELATIVE_SIZE, INITIAL_HOSPITAL_RELATIVE_SIZE
+//! Like: (H=Home, T=Transport, W=Work, I=Hospital)
+//!     HHHHH TT WWW II
+//!     HHHHH TT WWW II
+//!     HHHHH TT WWW II
+//!     HHHHH TT WWW II
+//!     HHHHH TT WWW II
+//!
+//! Then uses area factory, to make boxes inside the Home, and Work area to represent buildings
+//! Which are lined up next to each other
 use crate::constants;
 
 mod area;
@@ -63,18 +75,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn should_define_geography(){
+    fn should_define_geography() {
         let grid = define_geography(10);
-        assert_eq!(grid.housing_area.start_offset, Point::new(0,0));
-        assert_eq!(grid.housing_area.end_offset, Point::new(3,10));
+        assert_eq!(grid.housing_area.start_offset, Point::new(0, 0));
+        assert_eq!(grid.housing_area.end_offset, Point::new(3, 10));
 
-        assert_eq!(grid.transport_area.start_offset, Point::new(4,0));
-        assert_eq!(grid.transport_area.end_offset, Point::new(4,10));
+        assert_eq!(grid.transport_area.start_offset, Point::new(4, 0));
+        assert_eq!(grid.transport_area.end_offset, Point::new(4, 10));
 
-        assert_eq!(grid.work_area.start_offset, Point::new(5,0));
-        assert_eq!(grid.work_area.end_offset, Point::new(6,10));
+        assert_eq!(grid.work_area.start_offset, Point::new(5, 0));
+        assert_eq!(grid.work_area.end_offset, Point::new(6, 10));
 
-        assert_eq!(grid.hospital_area.start_offset, Point::new(7,0));
-        assert_eq!(grid.hospital_area.end_offset, Point::new(7,10));
+        assert_eq!(grid.hospital_area.start_offset, Point::new(7, 0));
+        assert_eq!(grid.hospital_area.end_offset, Point::new(7, 10));
     }
 }

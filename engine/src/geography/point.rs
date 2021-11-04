@@ -17,7 +17,7 @@
  *
  */
 
-use std::ops::Add;
+use std::ops::{Add, Sub};
 
 #[derive(Copy, Clone, Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Point {
@@ -44,6 +44,13 @@ impl Add for Point {
 
     fn add(self, second_point: Self) -> Self {
         Self { x: self.x + second_point.x, y: self.y + second_point.y }
+    }
+}
+
+impl Sub for Point {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self { x: self.x - rhs.y, y: self.y - rhs.y }
     }
 }
 
@@ -88,6 +95,14 @@ mod tests {
         let output = point + second_point;
         assert_eq!(output, Point::new(2, 2));
     }
+    #[test]
+    fn sub() {
+        let point = Point::new(1, 1);
+        let second_point = Point::new(1, 1);
+
+        let output = point - second_point;
+        assert_eq!(output, Point::new(0, 0));
+    }
 
     #[test]
     fn should_iterate_over_neighbor_cells() {
@@ -96,7 +111,7 @@ mod tests {
         assert_eq!(neighbors,
                    vec![Point::new(0, 0), Point::new(1, 0), Point::new(2, 0),
                         Point::new(0, 1), Point::new(2, 1),
-                        Point::new(0, 2), Point::new(1, 2), Point::new(2, 2)
+                        Point::new(0, 2), Point::new(1, 2), Point::new(2, 2),
                    ])
     }
 }
