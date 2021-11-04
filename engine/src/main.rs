@@ -19,9 +19,9 @@
 
 extern crate clap;
 #[macro_use]
-extern crate serde_derive;
-#[macro_use]
 extern crate log;
+#[macro_use]
+extern crate serde_derive;
 
 use clap::{App, Arg};
 
@@ -48,12 +48,15 @@ mod environment;
 mod disease_state_machine;
 mod travel_plan;
 mod travellers_consumer;
+mod census_geography;
 
 const STANDALONE_SIM_ID: &str = "0";
 
 #[tokio::main]
 async fn main() {
     env_logger::init();
+    println!("Hello");
+    let start = std::time::Instant::now();
     let matches = App::new("EpiRust")
         .version("0.1")
         .about("Epidemiology Simulations in Rust")
@@ -93,7 +96,8 @@ async fn main() {
         consumer.listen_loop(&run_mode).await;
         info!("Done");
     } else {
-        let config_file = matches.value_of("config").unwrap_or("config/default.json");
+        let config_file = matches.value_of("config").unwrap_or("config/pune_baseline.json");
+        println!("Using config file: {}", config_file);
 
         // let (count, grid_default) = match input_count {
         //     0..=100 => (100, 25),
@@ -112,6 +116,7 @@ async fn main() {
         epidemiology.run(&config, &run_mode).await;
         info!("Done");
     }
+    println!("Finished in {:?}", start.elapsed());
 }
 
 pub enum RunMode {

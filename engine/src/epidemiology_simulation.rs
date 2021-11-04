@@ -22,16 +22,22 @@ use core::borrow::BorrowMut;
 use std::time::{Duration, Instant, SystemTime};
 
 use chrono::{DateTime, Local};
+use futures::join;
 use futures::StreamExt;
 use rand::Rng;
+use rdkafka::consumer::{DefaultConsumerContext, MessageStream};
 
 use crate::{allocation_map, RunMode, ticks_consumer, travellers_consumer};
+use crate::agent::Citizen;
 use crate::allocation_map::AgentLocationMap;
 use crate::config::{Config, Population, StartingInfections};
+use crate::constants::HOSPITAL_STAFF_PERCENTAGE;
 use crate::disease::Disease;
+use crate::disease_state_machine::State;
 use crate::geography;
 use crate::geography::{Grid, Point};
 use crate::interventions::hospital::BuildNewHospital;
+use crate::interventions::Interventions;
 use crate::interventions::lockdown::LockdownIntervention;
 use crate::interventions::vaccination::VaccinateIntervention;
 use crate::kafka_producer::{KafkaProducer, TickAck};
@@ -39,18 +45,12 @@ use crate::listeners::csv_service::CsvListener;
 use crate::listeners::disease_tracker::Hotspot;
 use crate::listeners::events::counts::Counts;
 use crate::listeners::events_kafka_producer::EventsKafkaProducer;
-use crate::listeners::listener::{Listeners, Listener};
-use crate::random_wrapper::RandomWrapper;
-use rdkafka::consumer::{MessageStream, DefaultConsumerContext};
-use crate::ticks_consumer::Tick;
-use crate::travel_plan::{EngineTravelPlan, TravellersByRegion, Traveller};
-use futures::join;
-use crate::listeners::travel_counter::TravelCounter;
 use crate::listeners::intervention_reporter::InterventionReporter;
-use crate::interventions::Interventions;
-use crate::constants::HOSPITAL_STAFF_PERCENTAGE;
-use crate::agent::Citizen;
-use crate::disease_state_machine::State;
+use crate::listeners::listener::{Listener, Listeners};
+use crate::listeners::travel_counter::TravelCounter;
+use crate::random_wrapper::RandomWrapper;
+use crate::ticks_consumer::Tick;
+use crate::travel_plan::{EngineTravelPlan, Traveller, TravellersByRegion};
 
 pub struct Epidemiology {
     pub agent_location_map: allocation_map::AgentLocationMap,
@@ -70,6 +70,7 @@ impl Epidemiology {
         let (start_locations, agent_list) = match config.get_population() {
             Population::Csv(csv_pop) => grid.read_population(&csv_pop, &start_infections, &mut rng),
             Population::Auto(auto_pop) => grid.generate_population(&auto_pop, &start_infections, &mut rng),
+            Population::Census(_) => {}
         };
         grid.resize_hospital(agent_list.len() as i32, HOSPITAL_STAFF_PERCENTAGE, config.get_geography_parameters().hospital_beds_percentage);
 

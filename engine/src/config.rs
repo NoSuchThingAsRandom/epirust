@@ -21,7 +21,7 @@ use std::error::Error;
 use std::fs::File;
 
 use crate::disease::{Disease, DiseaseOverride};
-use crate::interventions::{InterventionConfig};
+use crate::interventions::InterventionConfig;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Config {
@@ -117,6 +117,7 @@ impl GeographyParameters{
 pub enum Population {
     Csv(CsvPopulation),
     Auto(AutoPopulation),
+    Census(CensusPopulation)
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
@@ -132,6 +133,11 @@ pub struct AutoPopulation {
     pub working_percentage: f64,
 }
 
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct CensusPopulation {
+    pub file: String,
+    pub cols: Vec<String>,
+}
 pub fn read(filename: String) -> Result<Config, Box<dyn Error>> {
     let reader = File::open(filename)?;
     let v: Config = serde_json::from_reader(reader)?;
@@ -195,8 +201,9 @@ impl Default for StartingInfections {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::interventions::vaccination::VaccinateConfig;
+
+    use super::*;
 
     #[test]
     fn should_read_config_with_csv_population() {
