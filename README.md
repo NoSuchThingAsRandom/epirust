@@ -1,3 +1,8 @@
+# This is a fork of Epi Rust aiming at introducing Multi threading and understanding the effects that incorporatiing real world census data  can have on the accuracy of a simulation.
+
+
+# Old Forked REAdME
+
 # EpiRust
 ## An agent-based epidemiology simulation framework built in Rust
 
