@@ -16,19 +16,22 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#![recursion_limit = "1024"]
 extern crate clap;
+#[macro_use]
+extern crate enum_map;
 #[macro_use]
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
 
 use std::time::Instant;
+
 use clap::{App, Arg};
 use rand::prelude::SliceRandom;
 use rand::thread_rng;
-use crate::geography::Point;
 
+use crate::geography::Point;
 use crate::kafka_consumer::KafkaConsumer;
 
 mod constants;
@@ -39,7 +42,6 @@ mod allocation_map;
 mod geography;
 mod disease;
 mod listeners;
-mod population;
 // mod geojson_service;
 // mod models;
 mod config;

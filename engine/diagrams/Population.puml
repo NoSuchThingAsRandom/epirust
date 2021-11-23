@@ -1,0 +1,59 @@
+@startuml
+'https://plantuml.com/class-diagram
+
+class Population {
+    data: Vec<OutputAreas>
+}
+entity OutputAreas{
+    code: String
+    total_population: u16,
+    agents: Vec<Citizen>,
+    area_size: f32,
+    density: f32,
+    population_counts: EnumMap<AreaClassification, Vec<Household>>,
+}
+entity Citizen{
+    pub id: Uuid,
+    immunity: i32,
+    pub home_location: HouseholdUuid,
+    pub work_location: Area,
+    vaccinated: bool,
+    pub uses_public_transport: bool,
+    working: bool,
+    hospitalized: bool,
+    pub transport_location: Point,
+    pub state_machine: DiseaseStateMachine,
+    isolated: bool,
+    current_area: Area,
+    work_status: WorkStatus,
+    work_quarantined: bool,
+}
+enum AreaClassification {
+    Total,
+    UrbanTotal,
+    UrbanMajorConurbation,
+    UrbanMinorConurbation,
+    UrbanCity,
+    UrbanSparseTownCity,
+    RuralTotal,
+    RuralTown,
+    RuralSparseTown,
+    RuralVillage,
+    RuralSparseVillage,
+    RuralHamlet,
+    RuralSparseHamlet,
+}
+entity Household{
+    //This is unique to the specific output area - ~250 households
+    pub unique_id: u16,
+    pub number_of_residents: u8,
+    // This is a list of citizen IDS that live here
+    pub residents: Vec<Uuid>,
+}
+Population "1" *-- "Many"  OutputAreas
+OutputAreas "1" *-- "Many"  Household
+OutputAreas "1" *-- "Many"  Citizen
+Household "1" *-- "Many"  Citizen
+Household "1" *- "*"  AreaClassification
+
+@enduml

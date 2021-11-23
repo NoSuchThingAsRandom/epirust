@@ -1,8 +1,9 @@
+use uuid::Uuid;
+
 pub struct Household {
     // This is unique to the specific output area - ~250 households
-    pub unique_id: u16,
-    pub number_of_residents: u8,
-    pub residents: Vec<u32>,
+    pub unique_id: Uuid,
+    pub residents: Vec<Uuid>,
 }
 
 

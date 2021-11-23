@@ -17,15 +17,15 @@
  *
  */
 
+use std::collections::HashMap;
+use std::fs::File;
+
 use plotters::prelude::*;
 
 use crate::{agent, constants};
 use crate::agent::{Citizen, PopulationRecord};
 use crate::config::{AutoPopulation, CsvPopulation, StartingInfections};
 use crate::geography::{Area, Point};
-
-use std::fs::File;
-use std::collections::HashMap;
 
 #[derive(Serialize)]
 pub struct Grid {
@@ -64,10 +64,10 @@ impl Grid {
         debug!("Finished creating agent list");
 
         let (home_loc, agents_in_order) = self.set_start_locations_and_occupancies(rng, &agent_list);
-
-        self.draw(&home_loc, &self.houses, &self.offices);
-        assert_eq!(home_loc.len(),agents_in_order.len());
-        (home_loc,agents_in_order)
+        // TODO Renable when plotters is fixed
+        //self.draw(&home_loc, &self.houses, &self.offices);
+        assert_eq!(home_loc.len(), agents_in_order.len());
+        (home_loc, agents_in_order)
     }
 
     /// Makes sure that each house, has enough squares for the given number of agents
@@ -121,32 +121,33 @@ impl Grid {
         });
         agents_by_home_locations
     }
-    /// Creates a png file, of the worls
-    /// Where each vertical slice is colour coded, to the area type (Home - Yellow, Transport - Grey, Work - Dark Blue , Hospital - Red)
-    /// Draws the actual homes,
-    fn draw(&self, home_locations: &Vec<Point>, homes: &Vec<Area>, offices: &Vec<Area>) {
-        let mut draw_backend = BitMapBackend::new("grid.png", (self.grid_size as u32, self.grid_size as u32));
-        Grid::draw_rect(&mut draw_backend, &self.housing_area, &plotters::style::YELLOW);
-        Grid::draw_rect(&mut draw_backend, &self.transport_area, &plotters::style::RGBColor(121, 121, 121));
-        Grid::draw_rect(&mut draw_backend, &self.work_area, &plotters::style::BLUE);
-        Grid::draw_rect(&mut draw_backend, &self.hospital_area, &plotters::style::RED);
-        for home in homes {
-            Grid::draw_rect(&mut draw_backend, home, &plotters::style::RGBColor(204, 153, 0));
+    // TODO Update the plotters to use the latest version
+    /*    /// Creates a png file, of the worls
+        /// Where each vertical slice is colour coded, to the area type (Home - Yellow, Transport - Grey, Work - Dark Blue , Hospital - Red)
+        /// Draws the actual homes,
+        fn draw(&self, home_locations: &Vec<Point>, homes: &Vec<Area>, offices: &Vec<Area>) {
+            let mut draw_backend = BitMapBackend::new("grid.png", (self.grid_size as u32, self.grid_size as u32));
+            Grid::draw_rect(&mut draw_backend, &self.housing_area, &plotters::style::YELLOW);
+            Grid::draw_rect(&mut draw_backend, &self.transport_area, &plotters::style::RGBColor(121, 121, 121));
+            Grid::draw_rect(&mut draw_backend, &self.work_area, &plotters::style::BLUE);
+            Grid::draw_rect(&mut draw_backend, &self.hospital_area, &plotters::style::RED);
+            for home in homes {
+                Grid::draw_rect(&mut draw_backend, home, &plotters::style::RGBColor(204, 153, 0));
+            }
+            for office in offices {
+                Grid::draw_rect(&mut draw_backend, office, &plotters::style::RGBColor(51, 153, 255));
+            }
+            for home in home_locations {
+                draw_backend.draw_pixel((home.x, home.y), &plotters::style::BLACK.to_rgba()).unwrap();
+            }
         }
-        for office in offices {
-            Grid::draw_rect(&mut draw_backend, office, &plotters::style::RGBColor(51, 153, 255));
-        }
-        for home in home_locations {
-            draw_backend.draw_pixel((home.x, home.y), &plotters::style::BLACK.to_rgba()).unwrap();
-        }
-    }
 
-    fn draw_rect(svg: &mut impl DrawingBackend, area: &Area, style: &RGBColor) {
-        svg.draw_rect((area.start_offset.x, area.start_offset.y),
-                      (area.end_offset.x, area.end_offset.y),
-                      style, true).unwrap();
-    }
-
+        fn draw_rect(svg: &mut impl DrawingBackend, area: &Area, style: &RGBColor) {
+            svg.draw_rect((area.start_offset.x, area.start_offset.y),
+                          (area.end_offset.x, area.end_offset.y),
+                          style, true).unwrap();
+        }
+    */
     pub fn read_population(&mut self, csv_pop: &CsvPopulation, starting_infections: &StartingInfections,
                            rng: &mut impl rand::RngCore) -> (Vec<Point>, Vec<Citizen>) {
         let file = File::open(&csv_pop.file).expect("Could not read population file");
@@ -173,7 +174,8 @@ impl Grid {
         let (home_loc, mut agents_in_order) = self.set_start_locations_and_occupancies(rng, &citizens);
         agent::set_starting_infections(&mut agents_in_order, starting_infections, rng);
 
-        self.draw(&home_loc, &self.houses, &self.offices);
+        // TODO Renable when plotters is fixed
+        //self.draw(&home_loc, &self.houses, &self.offices);
         (home_loc, agents_in_order)
     }
 
@@ -253,8 +255,10 @@ impl Grid {
 #[cfg(test)]
 mod tests {
     use rand::thread_rng;
-    use super::*;
+
     use crate::geography::define_geography;
+
+    use super::*;
 
     #[test]
     fn should_generate_population() {

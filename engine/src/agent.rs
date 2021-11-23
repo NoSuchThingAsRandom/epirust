@@ -30,7 +30,6 @@ use crate::constants;
 use crate::disease::Disease;
 use crate::disease_state_machine::DiseaseStateMachine;
 use crate::geography::{Area, Grid, Point};
-
 use crate::travel_plan::Traveller;
 
 #[derive(Deserialize)]
@@ -71,92 +70,98 @@ pub enum WorkStatus {
 pub struct Citizen {
     pub id: Uuid,
     immunity: i32,
-    pub home_location: Area,
-    pub work_location: Area,
+    pub home_location: Uuid,
+    //pub work_location: Area,
     vaccinated: bool,
-    pub uses_public_transport: bool,
+    ///pub uses_public_transport: bool,
     working: bool,
     hospitalized: bool,
-    pub transport_location: Point,
+    //pub transport_location: Point,
     pub state_machine: DiseaseStateMachine,
     isolated: bool,
-    current_area: Area,
-    work_status: WorkStatus,
-    work_quarantined: bool,
+    //current_area: Area,
+    //work_status: WorkStatus,
+    //work_quarantined: bool,
 }
 
 impl Citizen {
-    pub fn new(home_location: Area, work_location: Area, transport_location: Point,
+    pub fn new(home_location: Uuid, work_location: Area, transport_location: Point,
                uses_public_transport: bool, working: bool, work_status: WorkStatus, rng: &mut impl rand::RngCore) -> Citizen {
         Citizen::new_with_id(Uuid::new_v4(), home_location, work_location, transport_location, uses_public_transport,
                              working, work_status, rng)
     }
 
+    /*
+        pub fn new(home_location: Area, work_location: Area, transport_location: Point,
+                uses_public_transport: bool, working: bool, work_status: WorkStatus, rng: &mut impl rand::RngCore) -> Citizen {
+         Citizen::new_with_id(Uuid::new_v4(), home_location, work_location, transport_location, uses_public_transport,
+                              working, work_status, rng)
+     }
     pub fn new_with_id(id: Uuid, home_location: Area, work_location: Area, transport_location: Point,
-                       uses_public_transport: bool, working: bool, work_status: WorkStatus, rng: &mut impl rand::RngCore) -> Citizen {
-        let disease_randomness_factor = Citizen::generate_disease_randomness_factor(rng);
+                        uses_public_transport: bool, working: bool, work_status: WorkStatus, rng: &mut impl rand::RngCore) -> Citizen {
+         let disease_randomness_factor = Citizen::generate_disease_randomness_factor(rng);
 
-        Citizen {
-            id,
-            immunity: disease_randomness_factor,
-            home_location,
-            work_location,
-            transport_location,
-            vaccinated: false,
-            uses_public_transport,
-            working,
-            hospitalized: false,
-            state_machine: DiseaseStateMachine::new(),
-            isolated: false,
-            current_area: home_location,
-            work_status,
-            work_quarantined: false,
-        }
-    }
+         Citizen {
+             id,
+             immunity: disease_randomness_factor,
+             home_location,
+             work_location,
+             transport_location,
+             vaccinated: false,
+             uses_public_transport,
+             working,
+             hospitalized: false,
+             state_machine: DiseaseStateMachine::new(),
+             isolated: false,
+             current_area: home_location,
+             work_status,
+             work_quarantined: false,
+         }
+     }
 
-    pub fn from_traveller(traveller: &Traveller, home_location: Area, work_location: Area,
-                          transport_location: Point, current_area: Area) -> Citizen {
-        Citizen {
-            id: traveller.id,
-            immunity: traveller.immunity,
-            home_location,
-            work_location,
-            vaccinated: traveller.vaccinated,
-            uses_public_transport: traveller.uses_public_transport,
-            working: false,
-            hospitalized: false,
-            transport_location,
-            state_machine: traveller.state_machine,
-            isolated: false,
-            current_area,
-            work_status: WorkStatus::NA {},
-            work_quarantined: false,
-        }
-    }
+     pub fn from_traveller(traveller: &Traveller, home_location: Area, work_location: Area,
+                           transport_location: Point, current_area: Area) -> Citizen {
+         Citizen {
+             id: traveller.id,
+             immunity: traveller.immunity,
+             home_location,
+             work_location,
+             vaccinated: traveller.vaccinated,
+             uses_public_transport: traveller.uses_public_transport,
+             working: false,
+             hospitalized: false,
+             transport_location,
+             state_machine: traveller.state_machine,
+             isolated: false,
+             current_area,
+             work_status: WorkStatus::NA {},
+             work_quarantined: false,
+         }
+     }
 
-    pub fn from_record(record: PopulationRecord, home_location: Area, work_location: Area,
-                       transport_location: Point, rng: &mut impl rand::RngCore) -> Citizen {
-        let disease_randomness_factor = Citizen::generate_disease_randomness_factor(rng);
-        let work_status = Citizen::derive_work_status(record.working, rng);
+     pub fn from_record(record: PopulationRecord, home_location: Area, work_location: Area,
+                        transport_location: Point, rng: &mut impl rand::RngCore) -> Citizen {
+         let disease_randomness_factor = Citizen::generate_disease_randomness_factor(rng);
+         let work_status = Citizen::derive_work_status(record.working, rng);
 
-        Citizen {
-            id: Uuid::new_v4(),
-            immunity: disease_randomness_factor,
-            home_location,
-            work_location,
-            transport_location,
-            vaccinated: false,
-            uses_public_transport: record.pub_transport,
-            working: record.working,
-            hospitalized: false,
-            state_machine: DiseaseStateMachine::new(),
-            isolated: false,
-            current_area: home_location,
-            work_status,
-            work_quarantined: false,
-        }
-    }
-
+         Citizen {
+             id: Uuid::new_v4(),
+             immunity: disease_randomness_factor,
+             home_location,
+             work_location,
+             transport_location,
+             vaccinated: false,
+             uses_public_transport: record.pub_transport,
+             working: record.working,
+             hospitalized: false,
+             state_machine: DiseaseStateMachine::new(),
+             isolated: false,
+             current_area: home_location,
+             work_status,
+             work_quarantined: false,
+         }
+     }
+ */
     pub fn get_infection_transmission_rate(&self, disease: &Disease) -> f64 {
         disease.get_current_transmission_rate(self.state_machine.get_infection_day() + self.immunity)
     }
@@ -560,6 +565,7 @@ pub fn set_starting_infections(agent_list: &mut Vec<Citizen>, start_infections: 
 #[cfg(test)]
 mod tests {
     use rand::thread_rng;
+
     use super::*;
 
     fn before_each() -> Vec<Citizen> {
