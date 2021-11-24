@@ -17,77 +17,110 @@
  *
  */
 
+use crate::config::StartingInfections;
+
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq)]
 pub struct Counts {
-    hour: i32,
-    susceptible: i32,
-    exposed: i32,
-    infected: i32,
-    hospitalized: i32,
-    recovered: i32,
-    deceased: i32,
+    hour: u32,
+    susceptible: u32,
+    exposed: u32,
+    infected: u32,
+    hospitalized: u32,
+    recovered: u32,
+    deceased: u32,
 }
 
 impl Counts {
     #[cfg(test)]
-    pub fn new_test(hour: i32, susceptible: i32, exposed: i32, infected: i32, hospitalized: i32, recovered: i32, deceased: i32) -> Counts {
+    pub fn new_test(hour: u32, susceptible: u32, exposed: u32, infected: u32, hospitalized: u32, recovered: u32, deceased: u32) -> Counts {
         Counts { hour, susceptible, exposed, infected, hospitalized, recovered, deceased }
     }
 
-    pub fn new(susceptible: i32, exposed: i32, infected: i32) -> Counts {
+    pub fn new(susceptible: u32, exposed: u32, infected: u32) -> Counts {
         Counts { hour: 0, susceptible, exposed, infected, hospitalized: 0, recovered: 0, deceased: 0 }
     }
+    pub fn counts_at_start(population: u32, start_infections: &StartingInfections) -> Counts {
+        let s = population - start_infections.total();
+        let e = start_infections.get_exposed();
+        let i = start_infections.total_infected();
+        assert_eq!(s + e + i, population);
+        Counts::new(s, e, i)
+    }
 
-    pub fn get_susceptible(&self) -> i32 {
+    pub fn susceptible(&self) -> u32 {
         self.susceptible
     }
 
-    pub fn get_exposed(&self) -> i32 {
+    pub fn exposed(&self) -> u32 {
         self.exposed
     }
 
-    pub fn get_infected(&self) -> i32 {
+    pub fn infected(&self) -> u32 {
         self.infected
     }
 
-    pub fn get_hospitalized(&self) -> i32 {
+    pub fn hospitalized(&self) -> u32 {
         self.hospitalized
     }
 
-    pub fn get_recovered(&self) -> i32 {
+    pub fn recovered(&self) -> u32 {
         self.recovered
     }
 
-    pub fn get_deceased(&self) -> i32 {
+    pub fn deceased(&self) -> u32 {
         self.deceased
     }
 
-    pub fn get_hour(&self) -> i32 {
+    pub fn hour(&self) -> u32 {
         self.hour
     }
 
     pub fn update_susceptible(&mut self, count: i32) {
-        self.susceptible += count;
+        if count.is_negative() {
+            self.susceptible = self.susceptible.checked_sub(count.unsigned_abs()).expect("Cannot have a negative susceptible count!");
+        } else {
+            self.susceptible = self.susceptible.checked_add(count.unsigned_abs()).expect("Overflowed the maximum value for susceptible count!");
+        }
     }
 
     pub fn update_exposed(&mut self, count: i32) {
-        self.exposed += count;
+        if count.is_negative() {
+            self.exposed = self.exposed.checked_sub(count.unsigned_abs()).expect("Cannot have a negative exposed count!");
+        } else {
+            self.exposed = self.exposed.checked_add(count.unsigned_abs()).expect("Overflowed the maximum value for exposed count!");
+        }
     }
 
     pub fn update_infected(&mut self, count: i32) {
-        self.infected += count;
+        if count.is_negative() {
+            self.infected = self.infected.checked_sub(count.unsigned_abs()).expect("Cannot have a negative infected count!");
+        } else {
+            self.infected = self.infected.checked_add(count.unsigned_abs()).expect("Overflowed the maximum value for infected count!");
+        }
     }
 
     pub fn update_recovered(&mut self, count: i32) {
-        self.recovered += count;
+        if count.is_negative() {
+            self.recovered = self.recovered.checked_sub(count.unsigned_abs()).expect("Cannot have a negative recovered count!");
+        } else {
+            self.recovered = self.recovered.checked_add(count.unsigned_abs()).expect("Overflowed the maximum value for recovered count!");
+        }
     }
 
     pub fn update_deceased(&mut self, count: i32) {
-        self.deceased += count;
+        if count.is_negative() {
+            self.deceased = self.deceased.checked_sub(count.unsigned_abs()).expect("Cannot have a negative deceased count!");
+        } else {
+            self.deceased = self.deceased.checked_add(count.unsigned_abs()).expect("Overflowed the maximum value for deceased count!");
+        }
     }
 
     pub fn update_hospitalized(&mut self, count: i32) {
-        self.hospitalized += count;
+        if count.is_negative() {
+            self.hospitalized = self.hospitalized.checked_sub(count.unsigned_abs()).expect("Cannot have a negative hospitilized count!");
+        } else {
+            self.hospitalized = self.hospitalized.checked_add(count.unsigned_abs()).expect("Overflowed the maximum value for hospitilized count!");
+        }
     }
 
     pub fn increment_hour(&mut self) {
@@ -103,19 +136,19 @@ impl Counts {
         self.deceased = 0;
     }
 
-    pub fn total(&self) -> i32 {
+    pub fn total(&self) -> u32 {
         self.susceptible +
-        self.exposed +
-        self.infected +
-        self.hospitalized +
-        self.recovered +
-        self.deceased
+            self.exposed +
+            self.infected +
+            self.hospitalized +
+            self.recovered +
+            self.deceased
     }
 
     pub fn log(&self) {
-        info!("S: {}, E:{}, I: {}, H: {}, R: {}, D: {}", self.get_susceptible(), self.get_exposed(),
-              self.get_infected(), self.get_hospitalized(), self.get_recovered(),
-              self.get_deceased())
+        info!("S: {}, E:{}, I: {}, H: {}, R: {}, D: {}", self.susceptible(), self.exposed(),
+              self.infected(), self.hospitalized(), self.recovered(),
+              self.deceased())
     }
 }
 

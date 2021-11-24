@@ -25,34 +25,22 @@ extern crate log;
 #[macro_use]
 extern crate serde_derive;
 
-use std::time::Instant;
 
 use clap::{App, Arg};
-use rand::prelude::SliceRandom;
-use rand::thread_rng;
-
-use crate::geography::Point;
-use crate::kafka_consumer::KafkaConsumer;
 
 mod constants;
 
 mod agent;
 mod epidemiology_simulation;
-mod allocation_map;
-mod geography;
+
 mod disease;
 mod listeners;
 // mod geojson_service;
 // mod models;
 mod config;
 mod interventions;
-mod kafka_consumer;
-mod kafka_producer;
-mod ticks_consumer;
 mod environment;
 mod disease_state_machine;
-mod travel_plan;
-mod travellers_consumer;
 mod census_geography;
 
 const STANDALONE_SIM_ID: &str = "0";
@@ -70,12 +58,6 @@ async fn main() {
             .short("c")
             .value_name("FILE")
             .help("Use a config file to run the simulation"))
-        .arg(Arg::with_name("daemon")
-            .long("daemon")
-            .short("d")
-            .help("Start the engine in daemon mode. It will wait for messages from Kafka. \
-            Specifying this flag will cause the config argument to be ignored")
-            .takes_value(false))
         .arg(Arg::with_name("id")
             .long("id")
             .short("i")
@@ -84,53 +66,24 @@ async fn main() {
             .takes_value(true))
         .get_matches();
 
-    let daemon = matches.is_present("daemon");
-    let has_named_engine = matches.is_present("id");
-    let engine_id = matches.value_of("id").unwrap_or("default_engine");
-    let run_mode = if daemon && has_named_engine {
-        RunMode::MultiEngine { engine_id: engine_id.to_string() }
-    } else if daemon {
-        RunMode::SingleDaemon
-    } else {
-        RunMode::Standalone
-    };
+    let config_file = matches.value_of("config").unwrap_or("config/pune_baseline.json");
+    println!("Using config file: {}", config_file);
 
-    if daemon {
-        info!("Started in daemon mode");
-        let consumer = KafkaConsumer::new(engine_id, &["simulation_requests"]);
-        consumer.listen_loop(&run_mode).await;
-        info!("Done");
-    } else {
-        let config_file = matches.value_of("config").unwrap_or("config/pune_baseline.json");
-        println!("Using config file: {}", config_file);
+    // let (count, grid_default) = match input_count {
+    //     0..=100 => (100, 25),
+    //     101..=1000 => (1000, 80),
+    //     1001..=10000 => (10000, 250),
+    //     10001..=100_000 => (100_000, 800),
+    //     100_001..=1_000_000 => (1_000_000, 2500),
+    //     1_000_001..=2_000_000 => (2_000_000, 3550),
+    //     2_000_001..=5_000_000 => (5_000_000, 5660),
+    //     _ => panic!("Cannot run for {} agents", input_count)
+    // };
 
-        // let (count, grid_default) = match input_count {
-        //     0..=100 => (100, 25),
-        //     101..=1000 => (1000, 80),
-        //     1001..=10000 => (10000, 250),
-        //     10001..=100_000 => (100_000, 800),
-        //     100_001..=1_000_000 => (1_000_000, 2500),
-        //     1_000_001..=2_000_000 => (2_000_000, 3550),
-        //     2_000_001..=5_000_000 => (5_000_000, 5660),
-        //     _ => panic!("Cannot run for {} agents", input_count)
-        // };
+    let config = config::read(config_file.to_string()).expect("Failed to read config file");
 
-        let config = config::read(config_file.to_string()).expect("Failed to read config file");
-
-        let mut epidemiology = epidemiology_simulation::Epidemiology::new(&config, STANDALONE_SIM_ID.to_string());
-        epidemiology.run(&config, &run_mode).await;
-        info!("Done");
-    }
+    let mut epidemiology = epidemiology_simulation::Epidemiology::new(&config, STANDALONE_SIM_ID.to_string());
+    epidemiology.run(&config).await;
+    info!("Done");
     println!("Finished in {:?}", start.elapsed());
-}
-
-pub enum RunMode {
-    //run once and exit
-    Standalone,
-
-    //daemon mode, with only one engine
-    SingleDaemon,
-
-    //daemon mode, with multiple engines and an orchestrator
-    MultiEngine { engine_id: String },
 }

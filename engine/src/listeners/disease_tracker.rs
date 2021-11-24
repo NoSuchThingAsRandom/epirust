@@ -17,14 +17,16 @@
  *
  */
 
-use std::any::Any;
-use crate::listeners::listener::Listener;
-use crate::geography::Point;
-use crate::listeners::events::counts::Counts;
 use fnv::FnvHashMap;
+use std::any::Any;
+use uuid::Uuid;
+
+use crate::listeners::events::counts::Counts;
+use crate::listeners::listener::Listener;
 
 pub struct Hotspot {
-    disease_hotspot_tracker: FnvHashMap<Point, i32>
+    // Place IDS (household
+    disease_hotspot_tracker: FnvHashMap<Uuid, i32>,
 }
 
 impl Hotspot {
@@ -35,14 +37,13 @@ impl Hotspot {
 }
 
 impl Listener for Hotspot {
-    fn counts_updated(&mut self, _counts: Counts) {
-    }
+    fn counts_updated(&mut self, _counts: Counts) {}
 
-    fn simulation_ended(&mut self) {
-    }
+    fn simulation_ended(&mut self) {}
 
-    fn citizen_got_infected(&mut self, cell: &Point) {
-        let counter = self.disease_hotspot_tracker.entry(*cell).or_insert(0);
+    fn citizen_got_infected(&mut self, cell: &Uuid) {
+        // TODO Fix this
+        //let counter = self.disease_hotspot_tracker.entry(*cell).or_insert(0);
         *counter += 1;
     }
 
@@ -53,8 +54,8 @@ impl Listener for Hotspot {
 
 #[cfg(test)]
 mod tests{
-    use crate::listeners::disease_tracker::Hotspot;
     use crate::geography::Point;
+    use crate::listeners::disease_tracker::Hotspot;
     use crate::listeners::listener::Listener;
 
     #[test]

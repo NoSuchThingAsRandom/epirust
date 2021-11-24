@@ -81,6 +81,22 @@ pub fn load_areas_from_shape_file(filename: &str) -> Result<HashMap<String, geo_
     Ok(data)
 }
 
+#[derive(Clone)]
+pub struct AreaCode {
+    output_code: String,
+    area_type: AreaClassification,
+    building_id: Uuid,
+}
+
+impl AreaCode {
+    pub fn new(output_code: String, area_type: AreaClassification) -> AreaCode {
+        AreaCode {
+            output_code,
+            area_type,
+            building_id: Uuid::new_v4(),
+        }
+    }
+}
 /*#[cfg(test)]
 mod tests {
     use super::*;

@@ -24,39 +24,11 @@ use serde::{de, Deserialize, Deserializer};
 use serde::de::Unexpected;
 use uuid::Uuid;
 
-use crate::allocation_map::AgentLocationMap;
+use crate::census_geography::AreaCode;
 use crate::config::StartingInfections;
 use crate::constants;
 use crate::disease::Disease;
 use crate::disease_state_machine::DiseaseStateMachine;
-use crate::geography::{Area, Grid, Point};
-use crate::travel_plan::Traveller;
-
-#[derive(Deserialize)]
-pub struct PopulationRecord {
-    //TODO move to a better place
-    pub ind: i32,
-    pub age: String,
-    #[serde(deserialize_with = "bool_from_string")]
-    pub working: bool,
-    #[serde(deserialize_with = "bool_from_string")]
-    pub pub_transport: bool,
-}
-
-/// Deserialize bool from String with custom value mapping
-fn bool_from_string<'de, D>(deserializer: D) -> Result<bool, D::Error>
-    where
-        D: Deserializer<'de>,
-{
-    match String::deserialize(deserializer)?.as_ref() {
-        "True" => Ok(true),
-        "False" => Ok(false),
-        other => Err(de::Error::invalid_value(
-            Unexpected::Str(other),
-            &"True or False",
-        )),
-    }
-}
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum WorkStatus {
@@ -70,98 +42,35 @@ pub enum WorkStatus {
 pub struct Citizen {
     pub id: Uuid,
     immunity: i32,
-    pub home_location: Uuid,
-    //pub work_location: Area,
+    pub home_location: AreaCode,
+    pub work_location: AreaCode,
     vaccinated: bool,
     ///pub uses_public_transport: bool,
-    working: bool,
     hospitalized: bool,
     //pub transport_location: Point,
     pub state_machine: DiseaseStateMachine,
     isolated: bool,
     //current_area: Area,
-    //work_status: WorkStatus,
-    //work_quarantined: bool,
+    work_status: WorkStatus,
+    work_quarantined: bool,
 }
 
 impl Citizen {
-    pub fn new(home_location: Uuid, work_location: Area, transport_location: Point,
-               uses_public_transport: bool, working: bool, work_status: WorkStatus, rng: &mut impl rand::RngCore) -> Citizen {
-        Citizen::new_with_id(Uuid::new_v4(), home_location, work_location, transport_location, uses_public_transport,
-                             working, work_status, rng)
+    pub fn new(home_location: AreaCode, work_location: AreaCode, work_status: WorkStatus, rng: &mut impl rand::RngCore) -> Citizen {
+        let disease_randomness_factor = Citizen::generate_disease_randomness_factor(rng);
+        Citizen {
+            id: Uuid::new_v4(),
+            immunity: disease_randomness_factor,
+            home_location,
+            work_location,
+            vaccinated: false,
+            hospitalized: false,
+            state_machine: DiseaseStateMachine::new(),
+            isolated: false,
+            work_status,
+            work_quarantined: false,
+        }
     }
-
-    /*
-        pub fn new(home_location: Area, work_location: Area, transport_location: Point,
-                uses_public_transport: bool, working: bool, work_status: WorkStatus, rng: &mut impl rand::RngCore) -> Citizen {
-         Citizen::new_with_id(Uuid::new_v4(), home_location, work_location, transport_location, uses_public_transport,
-                              working, work_status, rng)
-     }
-    pub fn new_with_id(id: Uuid, home_location: Area, work_location: Area, transport_location: Point,
-                        uses_public_transport: bool, working: bool, work_status: WorkStatus, rng: &mut impl rand::RngCore) -> Citizen {
-         let disease_randomness_factor = Citizen::generate_disease_randomness_factor(rng);
-
-         Citizen {
-             id,
-             immunity: disease_randomness_factor,
-             home_location,
-             work_location,
-             transport_location,
-             vaccinated: false,
-             uses_public_transport,
-             working,
-             hospitalized: false,
-             state_machine: DiseaseStateMachine::new(),
-             isolated: false,
-             current_area: home_location,
-             work_status,
-             work_quarantined: false,
-         }
-     }
-
-     pub fn from_traveller(traveller: &Traveller, home_location: Area, work_location: Area,
-                           transport_location: Point, current_area: Area) -> Citizen {
-         Citizen {
-             id: traveller.id,
-             immunity: traveller.immunity,
-             home_location,
-             work_location,
-             vaccinated: traveller.vaccinated,
-             uses_public_transport: traveller.uses_public_transport,
-             working: false,
-             hospitalized: false,
-             transport_location,
-             state_machine: traveller.state_machine,
-             isolated: false,
-             current_area,
-             work_status: WorkStatus::NA {},
-             work_quarantined: false,
-         }
-     }
-
-     pub fn from_record(record: PopulationRecord, home_location: Area, work_location: Area,
-                        transport_location: Point, rng: &mut impl rand::RngCore) -> Citizen {
-         let disease_randomness_factor = Citizen::generate_disease_randomness_factor(rng);
-         let work_status = Citizen::derive_work_status(record.working, rng);
-
-         Citizen {
-             id: Uuid::new_v4(),
-             immunity: disease_randomness_factor,
-             home_location,
-             work_location,
-             transport_location,
-             vaccinated: false,
-             uses_public_transport: record.pub_transport,
-             working: record.working,
-             hospitalized: false,
-             state_machine: DiseaseStateMachine::new(),
-             isolated: false,
-             current_area: home_location,
-             work_status,
-             work_quarantined: false,
-         }
-     }
- */
     pub fn get_infection_transmission_rate(&self, disease: &Disease) -> f64 {
         disease.get_current_transmission_rate(self.state_machine.get_infection_day() + self.immunity)
     }
@@ -185,9 +94,6 @@ impl Citizen {
         self.isolated
     }
 
-    pub fn is_working(&self) -> bool {
-        self.working
-    }
 
     pub fn get_immunity(&self) -> i32 {
         self.immunity
@@ -218,7 +124,7 @@ impl Citizen {
                 new_cell = self.hospitalize(cell, &grid.hospital_area, map, rng,disease);
             }
             constants::SLEEP_START_TIME..=constants::SLEEP_END_TIME => {
-                if !self.is_hospital_staff() {
+                if let WorkStatus::HospitalStaff { .. } = self.work_status {
                     self.current_area = self.home_location;
                 }
             }
@@ -343,6 +249,7 @@ impl Citizen {
         }
     }
 
+    /// Sends Citizen to hospital if required
     fn hospitalize(&mut self, cell: Point, hospital: &Area, map: &AgentLocationMap, rng: &mut impl rand::RngCore,
                    disease: &Disease) -> Point {
         let mut new_cell = cell;
@@ -493,47 +400,6 @@ impl Citizen {
     pub fn is_infected_severe(&self) -> bool {
         self.state_machine.is_infected_severe()
     }
-}
-
-/// Builds all the citizens - and related info
-/// Allocates them evenly to homes and work places (NOTE Groups of people will share the same work/home places) - why?
-/// Assigns them to a transport square,
-pub fn citizen_factory(number_of_agents: i32, home_locations: &Vec<Area>, work_locations: &Vec<Area>, public_transport_locations: &Vec<Point>,
-                       percentage_public_transport: f64, working_percentage: f64, rng: &mut impl rand::RngCore,
-                       starting_infections: &StartingInfections) -> Vec<Citizen> {
-    let mut agent_list = Vec::with_capacity(home_locations.len());
-    for i in 0..number_of_agents as usize {
-        let is_a_working_citizen = rng.gen_bool(working_percentage);
-
-        let total_home_locations = home_locations.len();
-        let total_work_locations = work_locations.len();
-        // TODO Change this, to randomly distribute
-        home_locations.choose(rng);
-        let home_location = home_locations[(i % total_home_locations)];
-        let work_location = work_locations[(i % total_work_locations)];
-
-        let uses_public_transport = rng.gen_bool(percentage_public_transport)
-            && is_a_working_citizen
-            && i < public_transport_locations.len();
-        //TODO: Check the logic - Jayanta
-        let public_transport_location: Point = if uses_public_transport { public_transport_locations[i] } else {
-            home_location.get_random_point(rng)
-        };
-
-        let work_location = if is_a_working_citizen { work_location } else {
-            home_location
-        };
-        let work_status = Citizen::derive_work_status(is_a_working_citizen, rng);
-
-        let agent = Citizen::new(home_location, work_location, public_transport_location,
-                                 uses_public_transport, is_a_working_citizen, work_status, rng);
-
-        agent_list.push(agent);
-    }
-
-    set_starting_infections(&mut agent_list, starting_infections, rng);
-
-    agent_list
 }
 
 pub fn set_starting_infections(agent_list: &mut Vec<Citizen>, start_infections: &StartingInfections,

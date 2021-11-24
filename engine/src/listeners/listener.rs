@@ -20,10 +20,10 @@
 use std::any::Any;
 
 use crate::agent::Citizen;
-use crate::geography::{Point, Grid};
-use crate::listeners::events::counts::Counts;
 use crate::interventions::intervention_type::InterventionType;
-use crate::travel_plan::TravellersByRegion;
+use crate::listeners::events::counts::Counts;
+
+//use crate::travel_plan::TravellersByRegion;
 
 pub trait Listener {
     fn counts_updated(&mut self, _counts: Counts) {}

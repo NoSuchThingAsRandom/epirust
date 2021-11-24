@@ -17,10 +17,10 @@
  *
  */
 
-use crate::agent::Citizen;
-use crate::geography::Point;
-use crate::disease_state_machine::State;
 use uuid::Uuid;
+
+use crate::agent::Citizen;
+use crate::disease_state_machine::State;
 
 #[derive(Serialize)]
 pub struct CitizenState {
@@ -73,11 +73,11 @@ impl CitizenStatesAtHr {
 #[cfg(test)]
 mod tests {
     use rand::thread_rng;
+
+    use crate::agent::WorkStatus;
     use crate::geography::Area;
 
-
     use super::*;
-    use crate::agent::WorkStatus;
 
     #[test]
     fn citizen_states_at_hr() {

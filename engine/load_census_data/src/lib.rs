@@ -5,7 +5,7 @@ extern crate serde_json;
 mod nomis_download;
 pub mod parsing_error;
 pub mod population_and_density_per_output_area;
-mod table_144_enum_values;
+pub mod table_144_enum_values;
 
 use std::collections::HashMap;
 use log::{debug, error, info, warn};

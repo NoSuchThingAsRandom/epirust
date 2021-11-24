@@ -1,24 +1,41 @@
+use std::fmt::{Display, Formatter};
+
 use uuid::Uuid;
 
-pub struct Household {
-    // This is unique to the specific output area - ~250 households
-    pub unique_id: Uuid,
-    pub residents: Vec<Uuid>,
+use load_census_data::table_144_enum_values::AreaClassification;
+
+use crate::census_geography::AreaCode;
+
+impl Display for AreaCode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Output Area: {}, Area Type: {:?}, Building ID: {}", self.output_code, self.area_type, self.building_id)
+    }
 }
 
+pub struct Household {
+    /// This is unique to the specific output area - ~250 households
+    household_code: AreaCode,
+    /// A list of all the ID's of agents who live at his household
+    residents: Vec<Uuid>,
+}
 
-#[derive(Deserialize, Debug, Enum)]
-pub enum PersonType {
-    #[serde(alias = "All usual residents")]
-    All,
-    #[serde(alias = "Males")]
-    Male,
-    #[serde(alias = "Females")]
-    Female,
-    #[serde(alias = "Lives in a household")]
-    LivesInHousehold,
-    #[serde(alias = "Lives in a communal establishment")]
-    LivesInCommunalEstablishment,
-    #[serde(alias = "Schoolchild or full-time student aged 4 and over at their non term-time address")]
-    Schoolchild,
+impl Household {
+    pub fn new(household_code: AreaCode) -> Household {
+        Household { household_code, residents: Vec::new() }
+    }
+    pub fn add_citizen(&mut self, citizen_id: Uuid) {
+        self.residents.push(citizen_id);
+    }
+    pub fn household_code(&self) -> &AreaCode {
+        &self.household_code
+    }
+    pub fn residents(&self) -> &Vec<Uuid> {
+        &self.residents
+    }
+}
+
+impl Display for Household {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Household: {}, with {} residents", self.household_code, self.residents.len())
+    }
 }

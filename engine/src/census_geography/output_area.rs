@@ -1,44 +1,56 @@
-use std::collections::HashMap;
-
 use enum_map::EnumMap;
 
 use load_census_data::population_and_density_per_output_area::PopulationRecord as PopRecord;
+use load_census_data::table_144_enum_values::PersonType;
 
-use crate::agent::{Citizen, PopulationRecord};
-use crate::allocation_map;
-use crate::census_geography::household::Household;
-use crate::geography::Grid;
+use crate::agent::{Citizen, WorkStatus};
+use crate::census_geography::household::{AreaCode, Household};
 
 pub struct OutputArea {
     pub code: String,
-    pub agents: Vec<Citizen>,
+    pub citizens: Vec<Citizen>,
     pub area_size: f32,
     pub density: f32,
-    pub population_counts: EnumMap<AreaClassification, Vec<Household>>,
+    pub households: EnumMap<AreaClassification, Vec<Household>>,
     pub polygon: geo_types::Polygon<f64>,
-    pub agent_location_map: String,
-    //allocation_map::AgentLocationMap,
-    pub grid: String,//Grid,
 }
 
 impl OutputArea {
-    pub fn new(code: String, polygon: geo_types::Polygon<f64>, census_data: &PopRecord) -> OutputArea {
+    pub fn new(code: String, polygon: geo_types::Polygon<f64>, census_data: &PopRecord, rng: &mut impl rand::RngCore) -> OutputArea {
         // TODO Fix this
-        let household_number = 250;
-        let household_size = &census_data.population_size / household_number;
-        let mut generated_population = 0;
-        for household in 0..household_number {
-            generated_population += household_size;
+        let mut household_classification = EnumMap::default();
+        let mut citizens = Vec::with_capacity(census_data.population_size as usize);
+        for (area, pop_count) in census_data.population_counts.iter() {
+            // TODO Currently assigning 4 people per household
+            // Should use census data instead
+            let household_size = 4;
+            let household_number = pop_count[PersonType::All] / household_size;
+            let mut generated_population = 0;
+            let mut households = Vec::with_capacity(household_number as usize);
+            for _ in 0..household_number {
+                let area_code = AreaCode::new(code.to_string(), area);
+                let mut household = Household::new(area_code);
+                for _ in 0..household_size {
+                    // TODO Add workplaces to citizens
+                    let mut citizen = Citizen::new(area_code.clone(), area_code.clone(), WorkStatus::NA, rng);
+                    household.add_citizen(citizen.id);
+                    citizens.push(citizen);
+                    generated_population += 1;
+                }
+                households.push(household);
+                if generated_population >= pop_count[PersonType::All] {
+                    break;
+                }
+            }
+            household_classification[area] = households;
         }
         OutputArea {
             code,
-            agents: vec![],
-            area_size: 0.0,
-            density: 0.0,
-            population_counts: census_data.population_counts,
-            polygon: polygon,
-            agent_location_map: String::new(),
-            grid: String::new(),
+            citizens,
+            area_size: census_data.area_size,
+            density: census_data.density,
+            households: household_classification,
+            polygon,
         }
     }
 }

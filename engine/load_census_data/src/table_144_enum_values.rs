@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-#[derive(Deserialize, Debug, Enum)]
+#[derive(Deserialize, Debug, Enum, Clone, Copy)]
 pub enum AreaClassification {
     #[serde(alias = "Total")]
     Total,
